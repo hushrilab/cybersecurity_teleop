@@ -1,0 +1,10 @@
+name: cybersecurity_robotics
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8
+  - dpkt=1.9.8
+  - scipy=1.10.1
+  - termcolor
+  - joblib=1.2.0
+  - jupyter
