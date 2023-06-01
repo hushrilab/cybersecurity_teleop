@@ -26,59 +26,35 @@ def RoundToNearest(n, m):
 DEST_IP = '129.97.71.26'
 SOURCE_IP = '129.97.71.27'
 
-def FeatureExtractionCombined(sampleFolder, cap_folder, baseline, featureFolder, baseline_name, profile, network_condition, start_time, end_time, baseline_size):
-    traceInterval = end_time  # Amount of time in packet trace to consider for feature extraction
+def FeatureExtractionCombined(sampleFolder):
+    samples = os.listdir(sampleFolder)
 
-    feature_set_folder_stats = "extractedFeatures/" + cap_folder + "/" + baseline_name + "/" + profile + "/" + network_condition + '/Stats_' + str(start_time) + '_' + str(
-        end_time) + "_" + str(baseline_size) + "/" + featureFolder
-    if not os.path.exists(feature_set_folder_stats):
-        os.makedirs(feature_set_folder_stats)
-
-#     feature_set_folder_out_stats = "extractedFeatures/" + cap_folder + "/" + baseline_name + "/" + profile + "/" + network_condition + '/OutStats_' + str(start_time) + '_' + str(
-#         end_time) + "_" + str(baseline_size) + "/" + featureFolder
-#     if not os.path.exists(feature_set_folder_out_stats):
-#         os.makedirs(feature_set_folder_out_stats)
-
-#     feature_set_folder_in_stats = "extractedFeatures/" + cap_folder + "/" + baseline_name + "/" + profile + "/" + network_condition + '/InStats_' + str(start_time) + '_' + str(
-#         end_time) + "_" + str(baseline_size) + "/" + featureFolder
-#     if not os.path.exists(feature_set_folder_in_stats):
-#         os.makedirs(feature_set_folder_in_stats)
-
-#     feature_set_folder_time_stats = "extractedFeatures/" + cap_folder + "/" + baseline_name + "/" + profile + "/" + network_condition + '/TimeStats_' + str(start_time) + '_' + str(
-#         end_time) + "_" + str(baseline_size) + "/" + featureFolder
-#     if not os.path.exists(feature_set_folder_time_stats):
-#         os.makedirs(feature_set_folder_time_stats)
-
-    feature_set_folder_pl = "extractedFeatures/" + cap_folder + "/" + baseline_name + "/" + profile + "/" + network_condition + '/PL_' + str(start_time) + '_' + str(end_time) + "_" + str(
-        baseline_size) + "/" + featureFolder
-    if not os.path.exists(feature_set_folder_pl):
-        os.makedirs(feature_set_folder_pl)
-
-    arff_path_stats = feature_set_folder_stats + '/' + featureFolder + '.csv'
-    arff_path_pl = feature_set_folder_pl + '/' + featureFolder + '.csv'
-
-    arff_stats = open(arff_path_stats, 'wb')
-    arff_pl = open(arff_path_pl, 'wb')
-
-    written_header_stats = False
-    written_header_pl = False
-
-    udp_protocols_seen = set()
-
-    for i, sample in enumerate(baseline):
-        
-        print(sampleFolder + "/" + sample)
+    for i, sample in enumerate(samples):
         if (".DS_Store" in sample):
             continue
         if not os.path.exists(sampleFolder + "/" + sample):
             print("Corresponding .pcap does not exist")
             continue
-        statinfo = os.stat(sampleFolder + "/" + sample)
-        if statinfo.st_size <= 1048576:
-            print("Size is less than 1MB, something went wrong with the .pcap")
-            continue
-        
+        feature_set_folder_stats = "extractedFeatures/" + sample[:-5] + '/Stats'
+        if not os.path.exists(feature_set_folder_stats):
+            os.makedirs(feature_set_folder_stats)
 
+        feature_set_folder_pl = "extractedFeatures/" + sample[:-5] + '/PL'
+        if not os.path.exists(feature_set_folder_pl):
+            os.makedirs(feature_set_folder_pl)
+
+        arff_path_stats = feature_set_folder_stats + '/Stats' + '.csv'
+        arff_path_pl = feature_set_folder_pl + '/PL' + '.csv'
+
+        arff_stats = open(arff_path_stats, 'wb')
+        arff_pl = open(arff_path_pl, 'wb')
+
+        written_header_stats = False
+        written_header_pl = False
+
+        udp_protocols_seen = set()
+        statinfo = os.stat(sampleFolder + "/" + sample)
+        
         PrintDynamic(sampleFolder + "/" + sample + " " + str(i))
         with open(sampleFolder + "/" + sample, 'rb') as f:
             pcap_data = f.read()
@@ -86,7 +62,7 @@ def FeatureExtractionCombined(sampleFolder, cap_folder, baseline, featureFolder,
         pcap_io = io.BytesIO(pcap_data)
         pcap = dpkt.pcap.Reader(pcap_io)
 #         pcap = dpkt.pcap.Reader(f, encoding='latin-1')
-            
+
         # Analyse packets transmited
         totalPackets = 0
         totalPacketsIn = 0
@@ -137,92 +113,91 @@ def FeatureExtractionCombined(sampleFolder, cap_folder, baseline, featureFolder,
 
         prev_ts = 0
         absTimesOut = []
-        firstTime = start_time
         setFirst = False
         for ts, buf in pcap:
 
             if (not (setFirst)):
                 firstTime = ts
                 setFirst = True
-            if (ts < (firstTime + traceInterval)):
-                eth = dpkt.ethernet.Ethernet(buf)
-                ip_hdr = eth.data
 
-                try:
-                    src_ip_addr_str = socket.inet_ntoa(ip_hdr.src)
-                    dst_ip_addr_str = socket.inet_ntoa(ip_hdr.dst)
-                    udp_hdr = ip_hdr.data
-                    # Target UDP communication between both cluster machines
-                    if (ip_hdr.p == 17 and ((dst_ip_addr_str == SOURCE_IP and src_ip_addr_str == DEST_IP) or (src_ip_addr_str == SOURCE_IP and dst_ip_addr_str == DEST_IP))):
-                        # General packet statistics
-                        udp_protocols_seen.add(str(udp_hdr.data[0]) + ", " + str(udp_hdr.data[1]))
-                        totalPackets += 1
+            eth = dpkt.ethernet.Ethernet(buf)
+            ip_hdr = eth.data
 
-                        # If source is recipient
-                        if (src_ip_addr_str == DEST_IP):
-                            print("got here")
-                            totalPacketsIn += 1
-                            packetSizesIn.append(len(buf))
-                            binned = RoundToNearest(len(buf), binWidth)
-                            bin_dict2[binned] += 1
-                            if (prev_ts != 0):
-                                ts_difference = max(0, ts - prev_ts)
-                                packetTimesIn.append(ts_difference * 1000)
+            try:
+                src_ip_addr_str = socket.inet_ntoa(ip_hdr.src)
+                dst_ip_addr_str = socket.inet_ntoa(ip_hdr.dst)
+                udp_hdr = ip_hdr.data
+                # Target UDP communication between both cluster machines
+                if (ip_hdr.p == 17 and ((dst_ip_addr_str == SOURCE_IP and src_ip_addr_str == DEST_IP) or (src_ip_addr_str == SOURCE_IP and dst_ip_addr_str == DEST_IP))):
+                    # General packet statistics
+                    udp_protocols_seen.add(str(udp_hdr.data[0]) + ", " + str(udp_hdr.data[1]))
+                    totalPackets += 1
 
-                            if (out_current_burst != 0):
-                                if (out_current_burst > 1):
-                                    out_bursts_packets.append(out_current_burst)  # packets on burst
-                                    out_burst_sizes.append(out_current_burst_size)  # total bytes on burst
-                                    out_burst_times.append(ts - out_current_burst_start)
-                                out_current_burst = 0
-                                out_current_burst_size = 0
-                                out_current_burst_start = 0
-                            if (in_current_burst == 0):
-                                in_current_burst_start = ts
-                            in_current_burst += 1
-                            in_current_burst_size += len(buf)
-                        # If source is caller
-                        else:
-                            totalPacketsOut += 1
-                            absTimesOut.append(ts)
-                            packetSizesOut.append(len(buf))
-                            binned = RoundToNearest(len(buf), binWidth)
-                            bin_dict[binned] += 1
-                            if (prev_ts != 0):
-                                ts_difference = max(0, ts - prev_ts)
-                                packetTimesOut.append(ts_difference * 1000)
-                            if (out_current_burst == 0):
-                                out_current_burst_start = ts
-                            out_current_burst += 1
-                            out_current_burst_size += len(buf)
-
-                            if (in_current_burst != 0):
-                                if (in_current_burst > 1):
-                                    in_bursts_packets.append(out_current_burst)  # packets on burst
-                                    in_burst_sizes.append(out_current_burst_size)  # total bytes on burst
-                                    in_burst_times.append(ts - out_current_burst_start)
-                                in_current_burst = 0
-                                in_current_burst_size = 0
-                                in_current_burst_start = 0
-
-                        # Bytes transmitted statistics
-                        totalBytes += len(buf)
-                        if (src_ip_addr_str == DEST_IP):
-                            totalBytesIn += len(buf)
-                        else:
-                            totalBytesOut += len(buf)
-
-                        # Packet Size statistics
-                        packetSizes.append(len(buf))
-                        # Packet Times statistics
+                    # If source is recipient
+                    if (src_ip_addr_str == DEST_IP):
+                        print("got here")
+                        totalPacketsIn += 1
+                        packetSizesIn.append(len(buf))
+                        binned = RoundToNearest(len(buf), binWidth)
+                        bin_dict2[binned] += 1
                         if (prev_ts != 0):
-                            # print "{0:.6f}".format(ts)
                             ts_difference = max(0, ts - prev_ts)
-                            packetTimes.append(ts_difference * 1000)
+                            packetTimesIn.append(ts_difference * 1000)
 
-                        prev_ts = ts
-                except:
-                    pass
+                        if (out_current_burst != 0):
+                            if (out_current_burst > 1):
+                                out_bursts_packets.append(out_current_burst)  # packets on burst
+                                out_burst_sizes.append(out_current_burst_size)  # total bytes on burst
+                                out_burst_times.append(ts - out_current_burst_start)
+                            out_current_burst = 0
+                            out_current_burst_size = 0
+                            out_current_burst_start = 0
+                        if (in_current_burst == 0):
+                            in_current_burst_start = ts
+                        in_current_burst += 1
+                        in_current_burst_size += len(buf)
+                    # If source is caller
+                    else:
+                        totalPacketsOut += 1
+                        absTimesOut.append(ts)
+                        packetSizesOut.append(len(buf))
+                        binned = RoundToNearest(len(buf), binWidth)
+                        bin_dict[binned] += 1
+                        if (prev_ts != 0):
+                            ts_difference = max(0, ts - prev_ts)
+                            packetTimesOut.append(ts_difference * 1000)
+                        if (out_current_burst == 0):
+                            out_current_burst_start = ts
+                        out_current_burst += 1
+                        out_current_burst_size += len(buf)
+
+                        if (in_current_burst != 0):
+                            if (in_current_burst > 1):
+                                in_bursts_packets.append(out_current_burst)  # packets on burst
+                                in_burst_sizes.append(out_current_burst_size)  # total bytes on burst
+                                in_burst_times.append(ts - out_current_burst_start)
+                            in_current_burst = 0
+                            in_current_burst_size = 0
+                            in_current_burst_start = 0
+
+                    # Bytes transmitted statistics
+                    totalBytes += len(buf)
+                    if (src_ip_addr_str == DEST_IP):
+                        totalBytesIn += len(buf)
+                    else:
+                        totalBytesOut += len(buf)
+
+                    # Packet Size statistics
+                    packetSizes.append(len(buf))
+                    # Packet Times statistics
+                    if (prev_ts != 0):
+                        # print "{0:.6f}".format(ts)
+                        ts_difference = max(0, ts - prev_ts)
+                        packetTimes.append(ts_difference * 1000)
+
+                    prev_ts = ts
+            except:
+                pass
         f.close()
         
         print(len(packetSizesIn))
@@ -442,7 +417,7 @@ def FeatureExtractionCombined(sampleFolder, cap_folder, baseline, featureFolder,
             print("Skipping sample")
             continue
 
-        label = featureFolder
+        label = sample
 
         # Write sample features to the csv file
         f_names_stats = []
@@ -902,7 +877,7 @@ def FeatureExtractionCombined(sampleFolder, cap_folder, baseline, featureFolder,
 
     print ("UDP Protocols seen: " + str(udp_protocols_seen))
 
-def profile_processing(network_condition_type, profile_type, b, data_folder):
+def profile_processing(data_folder):
     cfgs = [
         # start_time, end_time, baseline_size
         [0, 30, 250],
@@ -912,8 +887,8 @@ def profile_processing(network_condition_type, profile_type, b, data_folder):
     cap_folder_name = "teleop_data"
 
     PrintColored("Analyzing " + network_condition + " Network Condition", "yellow")
-    samples_folder = data_folder + "/" + b + "/" + profile + "/" + network_condition
-
+    samples_folder = data_folder
+    
     #For different splits of baseline sizes (currently half of each dataset = 250 samples)
     for cfg in cfgs:
         start_time = cfg[0]
@@ -938,6 +913,5 @@ def profile_processing(network_condition_type, profile_type, b, data_folder):
         ## Combined Feature Extraction
         for i, baseline in enumerate(samples_baselines):
             PrintColored("Generating feature sets for " + b + "_" + str(i), 'green')
-            FeatureExtractionCombined(samples_folder, cap_folder_name, baseline, b + "_" + str(i), b, profile, network_condition, start_time, end_time, baseline_size)
+            FeatureExtractionCombined(samples_folder, cap_folder_name, baseline, b + "_" + str(i), b, profile, network_condition)
             print("\n")
-

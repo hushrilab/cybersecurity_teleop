@@ -10,7 +10,7 @@ In the project directory, run:
 
 to create the virtual environment for the project, 
 
-#### ` conda activate cybersecurity_robotics`
+#### `conda activate cybersecurity_robotics`
 
 to activate the virtual environment, 
 
