@@ -11,6 +11,7 @@ from termcolor import colored
 from joblib import Parallel, delayed
 import codecs
 import io
+from tsfresh import extract_features
 
 def PrintColored(string, color):
     print(colored(string, color))
@@ -22,11 +23,7 @@ def RoundToNearest(n, m):
         r = n % m
         return n + m - r if r + r >= m else n - r
 
-
-DEST_IP = '129.97.71.26'
-SOURCE_IP = '129.97.71.27'
-
-def FeatureExtractionCombined(sampleFolder):
+def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip, data_class):
     samples = os.listdir(sampleFolder)
 
     for i, sample in enumerate(samples):
@@ -52,7 +49,7 @@ def FeatureExtractionCombined(sampleFolder):
         written_header_stats = False
         written_header_pl = False
 
-        udp_protocols_seen = set()
+        tcp_protocols_seen = set()
         statinfo = os.stat(sampleFolder + "/" + sample)
         
         PrintDynamic(sampleFolder + "/" + sample + " " + str(i))
@@ -126,16 +123,18 @@ def FeatureExtractionCombined(sampleFolder):
             try:
                 src_ip_addr_str = socket.inet_ntoa(ip_hdr.src)
                 dst_ip_addr_str = socket.inet_ntoa(ip_hdr.dst)
-                udp_hdr = ip_hdr.data
-                # Target UDP communication between both cluster machines
-                if (ip_hdr.p == 17 and ((dst_ip_addr_str == SOURCE_IP and src_ip_addr_str == DEST_IP) or (src_ip_addr_str == SOURCE_IP and dst_ip_addr_str == DEST_IP))):
+                tcp_hdr = ip_hdr.data
+                # Target TCP communication between both cluster machines
+                if (ip_hdr.p == 6 and ((dst_ip_addr_str == source_ip and src_ip_addr_str == dest_ip) or (src_ip_addr_str == source_ip and dst_ip_addr_str == dest_ip))):
                     # General packet statistics
-                    udp_protocols_seen.add(str(udp_hdr.data[0]) + ", " + str(udp_hdr.data[1]))
+                    for byte in tcp_hdr.data:
+#                         print(byte)
+                        tcp_protocols_seen.add(str(byte) + " ")
+
                     totalPackets += 1
 
                     # If source is recipient
-                    if (src_ip_addr_str == DEST_IP):
-                        print("got here")
+                    if (src_ip_addr_str == dest_ip):
                         totalPacketsIn += 1
                         packetSizesIn.append(len(buf))
                         binned = RoundToNearest(len(buf), binWidth)
@@ -182,7 +181,7 @@ def FeatureExtractionCombined(sampleFolder):
 
                     # Bytes transmitted statistics
                     totalBytes += len(buf)
-                    if (src_ip_addr_str == DEST_IP):
+                    if (src_ip_addr_str == dest_ip):
                         totalBytesIn += len(buf)
                     else:
                         totalBytesOut += len(buf)
@@ -199,13 +198,6 @@ def FeatureExtractionCombined(sampleFolder):
             except:
                 pass
         f.close()
-        
-        print(len(packetSizesIn))
-        print(len(packetTimesIn))
-        print(len(out_bursts_packets))
-        print(len(out_burst_sizes))
-        print(len(in_bursts_packets))
-        print(len(in_burst_sizes))
         ################################################################
         ####################Compute statistics#####################
         ################################################################
@@ -232,23 +224,23 @@ def FeatureExtractionCombined(sampleFolder):
 
             ##########################################################
             # Statistical indicators for packet sizes (in)
-#             meanPacketSizesIn = np.mean(packetSizesIn)
-#             medianPacketSizesIn = np.median(packetSizesIn)
-#             stdevPacketSizesIn = np.std(packetSizesIn)
-#             variancePacketSizesIn = np.var(packetSizesIn)
-#             kurtosisPacketSizesIn = kurtosis(packetSizesIn)
-#             skewPacketSizesIn = skew(packetSizesIn)
-#             maxPacketSizeIn = np.amax(packetSizesIn)
-#             minPacketSizeIn = np.amin(packetSizesIn)
-#             p10PacketSizesIn = np.percentile(packetSizesIn, 10)
-#             p20PacketSizesIn = np.percentile(packetSizesIn, 20)
-#             p30PacketSizesIn = np.percentile(packetSizesIn, 30)
-#             p40PacketSizesIn = np.percentile(packetSizesIn, 40)
-#             p50PacketSizesIn = np.percentile(packetSizesIn, 50)
-#             p60PacketSizesIn = np.percentile(packetSizesIn, 60)
-#             p70PacketSizesIn = np.percentile(packetSizesIn, 70)
-#             p80PacketSizesIn = np.percentile(packetSizesIn, 80)
-#             p90PacketSizesIn = np.percentile(packetSizesIn, 90)
+            meanPacketSizesIn = np.mean(packetSizesIn)
+            medianPacketSizesIn = np.median(packetSizesIn)
+            stdevPacketSizesIn = np.std(packetSizesIn)
+            variancePacketSizesIn = np.var(packetSizesIn)
+            kurtosisPacketSizesIn = kurtosis(packetSizesIn)
+            skewPacketSizesIn = skew(packetSizesIn)
+            maxPacketSizeIn = np.amax(packetSizesIn)
+            minPacketSizeIn = np.amin(packetSizesIn)
+            p10PacketSizesIn = np.percentile(packetSizesIn, 10)
+            p20PacketSizesIn = np.percentile(packetSizesIn, 20)
+            p30PacketSizesIn = np.percentile(packetSizesIn, 30)
+            p40PacketSizesIn = np.percentile(packetSizesIn, 40)
+            p50PacketSizesIn = np.percentile(packetSizesIn, 50)
+            p60PacketSizesIn = np.percentile(packetSizesIn, 60)
+            p70PacketSizesIn = np.percentile(packetSizesIn, 70)
+            p80PacketSizesIn = np.percentile(packetSizesIn, 80)
+            p90PacketSizesIn = np.percentile(packetSizesIn, 90)
 
             ##########################################################
             # Statistical indicators for packet sizes (out)
@@ -293,23 +285,23 @@ def FeatureExtractionCombined(sampleFolder):
 
             ##################################################################
             # Statistical indicators for Inter-Packet Times (in)
-#             meanPacketTimesIn = np.mean(packetTimesIn)
-#             medianPacketTimesIn = np.median(packetTimesIn)
-#             stdevPacketTimesIn = np.std(packetTimesIn)
-#             variancePacketTimesIn = np.var(packetTimesIn)
-#             kurtosisPacketTimesIn = kurtosis(packetTimesIn)
-#             skewPacketTimesIn = skew(packetTimesIn)
-#             maxPacketTimesIn = np.amax(packetTimesIn)
-#             minPacketTimesIn = np.amin(packetTimesIn)
-#             p10PacketTimesIn = np.percentile(packetTimesIn, 10)
-#             p20PacketTimesIn = np.percentile(packetTimesIn, 20)
-#             p30PacketTimesIn = np.percentile(packetTimesIn, 30)
-#             p40PacketTimesIn = np.percentile(packetTimesIn, 40)
-#             p50PacketTimesIn = np.percentile(packetTimesIn, 50)
-#             p60PacketTimesIn = np.percentile(packetTimesIn, 60)
-#             p70PacketTimesIn = np.percentile(packetTimesIn, 70)
-#             p80PacketTimesIn = np.percentile(packetTimesIn, 80)
-#             p90PacketTimesIn = np.percentile(packetTimesIn, 90)
+            meanPacketTimesIn = np.mean(packetTimesIn)
+            medianPacketTimesIn = np.median(packetTimesIn)
+            stdevPacketTimesIn = np.std(packetTimesIn)
+            variancePacketTimesIn = np.var(packetTimesIn)
+            kurtosisPacketTimesIn = kurtosis(packetTimesIn)
+            skewPacketTimesIn = skew(packetTimesIn)
+            maxPacketTimesIn = np.amax(packetTimesIn)
+            minPacketTimesIn = np.amin(packetTimesIn)
+            p10PacketTimesIn = np.percentile(packetTimesIn, 10)
+            p20PacketTimesIn = np.percentile(packetTimesIn, 20)
+            p30PacketTimesIn = np.percentile(packetTimesIn, 30)
+            p40PacketTimesIn = np.percentile(packetTimesIn, 40)
+            p50PacketTimesIn = np.percentile(packetTimesIn, 50)
+            p60PacketTimesIn = np.percentile(packetTimesIn, 60)
+            p70PacketTimesIn = np.percentile(packetTimesIn, 70)
+            p80PacketTimesIn = np.percentile(packetTimesIn, 80)
+            p90PacketTimesIn = np.percentile(packetTimesIn, 90)
 
             ##################################################################
             # Statistical indicators for Inter-Packet Times (out)
@@ -334,90 +326,48 @@ def FeatureExtractionCombined(sampleFolder):
             ########################################################################
             # Statistical indicators for Outgoing bursts
 
-#             out_totalBursts = len(out_bursts_packets)
-#             out_meanBurst = np.mean(out_bursts_packets)
-#             out_medianBurst = np.median(out_bursts_packets)
-#             out_stdevBurst = np.std(out_bursts_packets)
-#             out_varianceBurst = np.var(out_bursts_packets)
-#             out_maxBurst = np.amax(out_bursts_packets)
-#             out_kurtosisBurst = kurtosis(out_bursts_packets)
-#             out_skewBurst = skew(out_bursts_packets)
-#             out_p10Burst = np.percentile(out_bursts_packets, 10)
-#             out_p20Burst = np.percentile(out_bursts_packets, 20)
-#             out_p30Burst = np.percentile(out_bursts_packets, 30)
-#             out_p40Burst = np.percentile(out_bursts_packets, 40)
-#             out_p50Burst = np.percentile(out_bursts_packets, 50)
-#             out_p60Burst = np.percentile(out_bursts_packets, 60)
-#             out_p70Burst = np.percentile(out_bursts_packets, 70)
-#             out_p80Burst = np.percentile(out_bursts_packets, 80)
-#             out_p90Burst = np.percentile(out_bursts_packets, 90)
+            out_totalBursts = len(out_bursts_packets)
+            out_meanBurst = np.mean(out_bursts_packets)
+            out_medianBurst = np.median(out_bursts_packets)
+            out_stdevBurst = np.std(out_bursts_packets)
+            out_varianceBurst = np.var(out_bursts_packets)
+            out_maxBurst = np.amax(out_bursts_packets)
+            out_kurtosisBurst = kurtosis(out_bursts_packets)
+            out_skewBurst = skew(out_bursts_packets)
+            out_p10Burst = np.percentile(out_bursts_packets, 10)
+            out_p20Burst = np.percentile(out_bursts_packets, 20)
+            out_p30Burst = np.percentile(out_bursts_packets, 30)
+            out_p40Burst = np.percentile(out_bursts_packets, 40)
+            out_p50Burst = np.percentile(out_bursts_packets, 50)
+            out_p60Burst = np.percentile(out_bursts_packets, 60)
+            out_p70Burst = np.percentile(out_bursts_packets, 70)
+            out_p80Burst = np.percentile(out_bursts_packets, 80)
+            out_p90Burst = np.percentile(out_bursts_packets, 90)
 
             ########################################################################
             # Statistical indicators for Outgoing bytes (sliced intervals)
-#             out_meanBurstBytes = np.mean(out_burst_sizes)
-#             out_medianBurstBytes = np.median(out_burst_sizes)
-#             out_stdevBurstBytes = np.std(out_burst_sizes)
-#             out_varianceBurstBytes = np.var(out_burst_sizes)
-#             out_kurtosisBurstBytes = kurtosis(out_burst_sizes)
-#             out_skewBurstBytes = skew(out_burst_sizes)
-#             out_maxBurstBytes = np.amax(out_burst_sizes)
-#             out_minBurstBytes = np.amin(out_burst_sizes)
-#             out_p10BurstBytes = np.percentile(out_burst_sizes, 10)
-#             out_p20BurstBytes = np.percentile(out_burst_sizes, 20)
-#             out_p30BurstBytes = np.percentile(out_burst_sizes, 30)
-#             out_p40BurstBytes = np.percentile(out_burst_sizes, 40)
-#             out_p50BurstBytes = np.percentile(out_burst_sizes, 50)
-#             out_p60BurstBytes = np.percentile(out_burst_sizes, 60)
-#             out_p70BurstBytes = np.percentile(out_burst_sizes, 70)
-#             out_p80BurstBytes = np.percentile(out_burst_sizes, 80)
-#             out_p90BurstBytes = np.percentile(out_burst_sizes, 90)
+            out_meanBurstBytes = np.mean(out_burst_sizes)
+            out_medianBurstBytes = np.median(out_burst_sizes)
+            out_stdevBurstBytes = np.std(out_burst_sizes)
+            out_varianceBurstBytes = np.var(out_burst_sizes)
+            out_kurtosisBurstBytes = kurtosis(out_burst_sizes)
+            out_skewBurstBytes = skew(out_burst_sizes)
+            out_maxBurstBytes = np.amax(out_burst_sizes)
+            out_minBurstBytes = np.amin(out_burst_sizes)
+            out_p10BurstBytes = np.percentile(out_burst_sizes, 10)
+            out_p20BurstBytes = np.percentile(out_burst_sizes, 20)
+            out_p30BurstBytes = np.percentile(out_burst_sizes, 30)
+            out_p40BurstBytes = np.percentile(out_burst_sizes, 40)
+            out_p50BurstBytes = np.percentile(out_burst_sizes, 50)
+            out_p60BurstBytes = np.percentile(out_burst_sizes, 60)
+            out_p70BurstBytes = np.percentile(out_burst_sizes, 70)
+            out_p80BurstBytes = np.percentile(out_burst_sizes, 80)
+            out_p90BurstBytes = np.percentile(out_burst_sizes, 90)
 
-            ########################################################################
-            # Statistical indicators for Incoming bursts
-
-#             in_totalBursts = len(in_bursts_packets)
-#             in_meanBurst = np.mean(in_bursts_packets)
-#             in_medianBurst = np.median(in_bursts_packets)
-#             in_stdevBurst = np.std(in_bursts_packets)
-#             in_varianceBurst = np.var(in_bursts_packets)
-#             in_maxBurst = np.amax(in_bursts_packets)
-#             in_kurtosisBurst = kurtosis(in_bursts_packets)
-#             in_skewBurst = skew(in_bursts_packets)
-#             in_p10Burst = np.percentile(in_bursts_packets, 10)
-#             in_p20Burst = np.percentile(in_bursts_packets, 20)
-#             in_p30Burst = np.percentile(in_bursts_packets, 30)
-#             in_p40Burst = np.percentile(in_bursts_packets, 40)
-#             in_p50Burst = np.percentile(in_bursts_packets, 50)
-#             in_p60Burst = np.percentile(in_bursts_packets, 60)
-#             in_p70Burst = np.percentile(in_bursts_packets, 70)
-#             in_p80Burst = np.percentile(in_bursts_packets, 80)
-#             in_p90Burst = np.percentile(in_bursts_packets, 90)
-
-            ########################################################################
-            # Statistical indicators for Incoming burst bytes (sliced intervals)
-#             in_meanBurstBytes = np.mean(in_burst_sizes)
-#             in_medianBurstBytes = np.median(in_burst_sizes)
-#             in_stdevBurstBytes = np.std(in_burst_sizes)
-#             in_varianceBurstBytes = np.var(in_burst_sizes)
-#             in_kurtosisBurstBytes = kurtosis(in_burst_sizes)
-#             in_skewBurstBytes = skew(in_burst_sizes)
-#             in_maxBurstBytes = np.amax(in_burst_sizes)
-#             in_minBurstBytes = np.amin(in_burst_sizes)
-#             in_p10BurstBytes = np.percentile(in_burst_sizes, 10)
-#             in_p20BurstBytes = np.percentile(in_burst_sizes, 20)
-#             in_p30BurstBytes = np.percentile(in_burst_sizes, 30)
-#             in_p40BurstBytes = np.percentile(in_burst_sizes, 40)
-#             in_p50BurstBytes = np.percentile(in_burst_sizes, 50)
-#             in_p60BurstBytes = np.percentile(in_burst_sizes, 60)
-#             in_p70BurstBytes = np.percentile(in_burst_sizes, 70)
-#             in_p80BurstBytes = np.percentile(in_burst_sizes, 80)
-#             in_p90BurstBytes = np.percentile(in_burst_sizes, 90)
         except:
             print("Error when processing " + sampleFolder + "/" + sample)
             print("Skipping sample")
             continue
-
-        label = sample
 
         # Write sample features to the csv file
         f_names_stats = []
@@ -491,41 +441,41 @@ def FeatureExtractionCombined(sampleFolder):
 
         ###################################################################
         # Packet Length Features (in)
-#         f_names_stats.append('minPacketSizeIn')
-#         f_values_stats.append(minPacketSizeIn)
-#         f_names_stats.append('maxPacketSizeIn')
-#         f_values_stats.append(maxPacketSizeIn)
-#         # f_names_stats.append('medianPacketSizesIn')
-#         # f_values_stats.append(medianPacketSizesIn)
-#         f_names_stats.append('meanPacketSizesIn')
-#         f_values_stats.append(meanPacketSizesIn)
-#         f_names_stats.append('stdevPacketSizesIn')
-#         f_values_stats.append(stdevPacketSizesIn)
-#         f_names_stats.append('variancePacketSizesIn')
-#         f_values_stats.append(variancePacketSizesIn)
-#         f_names_stats.append('skewPacketSizesIn')
-#         f_values_stats.append(skewPacketSizesIn)
-#         f_names_stats.append('kurtosisPacketSizesIn')
-#         f_values_stats.append(kurtosisPacketSizesIn)
+        f_names_stats.append('minPacketSizeIn')
+        f_values_stats.append(minPacketSizeIn)
+        f_names_stats.append('maxPacketSizeIn')
+        f_values_stats.append(maxPacketSizeIn)
+        # f_names_stats.append('medianPacketSizesIn')
+        # f_values_stats.append(medianPacketSizesIn)
+        f_names_stats.append('meanPacketSizesIn')
+        f_values_stats.append(meanPacketSizesIn)
+        f_names_stats.append('stdevPacketSizesIn')
+        f_values_stats.append(stdevPacketSizesIn)
+        f_names_stats.append('variancePacketSizesIn')
+        f_values_stats.append(variancePacketSizesIn)
+        f_names_stats.append('skewPacketSizesIn')
+        f_values_stats.append(skewPacketSizesIn)
+        f_names_stats.append('kurtosisPacketSizesIn')
+        f_values_stats.append(kurtosisPacketSizesIn)
 
-#         f_names_stats.append('p10PacketSizesIn')
-#         f_values_stats.append(p10PacketSizesIn)
-#         f_names_stats.append('p20PacketSizesIn')
-#         f_values_stats.append(p20PacketSizesIn)
-#         f_names_stats.append('p30PacketSizesIn')
-#         f_values_stats.append(p30PacketSizesIn)
-#         f_names_stats.append('p40PacketSizesIn')
-#         f_values_stats.append(p40PacketSizesIn)
-#         f_names_stats.append('p50PacketSizesIn')
-#         f_values_stats.append(p50PacketSizesIn)
-#         f_names_stats.append('p60PacketSizesIn')
-#         f_values_stats.append(p60PacketSizesIn)
-#         f_names_stats.append('p70PacketSizesIn')
-#         f_values_stats.append(p70PacketSizesIn)
-#         f_names_stats.append('p80PacketSizesIn')
-#         f_values_stats.append(p80PacketSizesIn)
-#         f_names_stats.append('p90PacketSizesIn')
-#         f_values_stats.append(p90PacketSizesIn)
+        f_names_stats.append('p10PacketSizesIn')
+        f_values_stats.append(p10PacketSizesIn)
+        f_names_stats.append('p20PacketSizesIn')
+        f_values_stats.append(p20PacketSizesIn)
+        f_names_stats.append('p30PacketSizesIn')
+        f_values_stats.append(p30PacketSizesIn)
+        f_names_stats.append('p40PacketSizesIn')
+        f_values_stats.append(p40PacketSizesIn)
+        f_names_stats.append('p50PacketSizesIn')
+        f_values_stats.append(p50PacketSizesIn)
+        f_names_stats.append('p60PacketSizesIn')
+        f_values_stats.append(p60PacketSizesIn)
+        f_names_stats.append('p70PacketSizesIn')
+        f_values_stats.append(p70PacketSizesIn)
+        f_names_stats.append('p80PacketSizesIn')
+        f_values_stats.append(p80PacketSizesIn)
+        f_names_stats.append('p90PacketSizesIn')
+        f_values_stats.append(p90PacketSizesIn)
 
         ###################################################################
         # Packet Length Features (out)
@@ -605,41 +555,41 @@ def FeatureExtractionCombined(sampleFolder):
 
         ###################################################################
         # Packet Timing Features (in)
-#         f_names_stats.append('minPacketTimesIn')
-#         f_values_stats.append(minPacketTimesIn)
-#         f_names_stats.append('maxPacketTimesIn')
-#         f_values_stats.append(maxPacketTimesIn)
-#         # f_names_stats.append('medianPacketTimesIn')
-#         # f_values_stats.append(medianPacketTimesIn)
-#         f_names_stats.append('meanPacketTimesIn')
-#         f_values_stats.append(meanPacketTimesIn)
-#         f_names_stats.append('stdevPacketTimesIn')
-#         f_values_stats.append(stdevPacketTimesIn)
-#         f_names_stats.append('variancePacketTimesIn')
-#         f_values_stats.append(variancePacketTimesIn)
-#         f_names_stats.append('skewPacketTimesIn')
-#         f_values_stats.append(skewPacketTimesIn)
-#         f_names_stats.append('kurtosisPacketTimesIn')
-#         f_values_stats.append(kurtosisPacketTimesIn)
+        f_names_stats.append('minPacketTimesIn')
+        f_values_stats.append(minPacketTimesIn)
+        f_names_stats.append('maxPacketTimesIn')
+        f_values_stats.append(maxPacketTimesIn)
+        # f_names_stats.append('medianPacketTimesIn')
+        # f_values_stats.append(medianPacketTimesIn)
+        f_names_stats.append('meanPacketTimesIn')
+        f_values_stats.append(meanPacketTimesIn)
+        f_names_stats.append('stdevPacketTimesIn')
+        f_values_stats.append(stdevPacketTimesIn)
+        f_names_stats.append('variancePacketTimesIn')
+        f_values_stats.append(variancePacketTimesIn)
+        f_names_stats.append('skewPacketTimesIn')
+        f_values_stats.append(skewPacketTimesIn)
+        f_names_stats.append('kurtosisPacketTimesIn')
+        f_values_stats.append(kurtosisPacketTimesIn)
 
-#         f_names_stats.append('p10PacketTimesIn')
-#         f_values_stats.append(p10PacketTimesIn)
-#         f_names_stats.append('p20PacketTimesIn')
-#         f_values_stats.append(p20PacketTimesIn)
-#         f_names_stats.append('p30PacketTimesIn')
-#         f_values_stats.append(p30PacketTimesIn)
-#         f_names_stats.append('p40PacketTimesIn')
-#         f_values_stats.append(p40PacketTimesIn)
-#         f_names_stats.append('p50PacketTimesIn')
-#         f_values_stats.append(p50PacketTimesIn)
-#         f_names_stats.append('p60PacketTimesIn')
-#         f_values_stats.append(p60PacketTimesIn)
-#         f_names_stats.append('p70PacketTimesIn')
-#         f_values_stats.append(p70PacketTimesIn)
-#         f_names_stats.append('p80PacketTimesIn')
-#         f_values_stats.append(p80PacketTimesIn)
-#         f_names_stats.append('p90PacketTimesIn')
-#         f_values_stats.append(p90PacketTimesIn)
+        f_names_stats.append('p10PacketTimesIn')
+        f_values_stats.append(p10PacketTimesIn)
+        f_names_stats.append('p20PacketTimesIn')
+        f_values_stats.append(p20PacketTimesIn)
+        f_names_stats.append('p30PacketTimesIn')
+        f_values_stats.append(p30PacketTimesIn)
+        f_names_stats.append('p40PacketTimesIn')
+        f_values_stats.append(p40PacketTimesIn)
+        f_names_stats.append('p50PacketTimesIn')
+        f_values_stats.append(p50PacketTimesIn)
+        f_names_stats.append('p60PacketTimesIn')
+        f_values_stats.append(p60PacketTimesIn)
+        f_names_stats.append('p70PacketTimesIn')
+        f_values_stats.append(p70PacketTimesIn)
+        f_names_stats.append('p80PacketTimesIn')
+        f_values_stats.append(p80PacketTimesIn)
+        f_names_stats.append('p90PacketTimesIn')
+        f_values_stats.append(p90PacketTimesIn)
 
         ###################################################################
         # Packet Timing Features (out)
@@ -679,160 +629,9 @@ def FeatureExtractionCombined(sampleFolder):
         f_names_stats.append('p90PacketTimesOut')
         f_values_stats.append(p90PacketTimesOut)
 
-        #################################################################
-        # Outgoing Packet number of Bursts features
-#         f_names_stats.append('out_totalBursts')
-#         f_values_stats.append(out_totalBursts)
-#         f_names_stats.append('out_maxBurst')
-#         f_values_stats.append(out_maxBurst)
-#         f_names_stats.append('out_meanBurst')
-#         f_values_stats.append(out_meanBurst)
-#         # f_names_stats.append('out_medianBurst')
-#         # f_values_stats.append(out_medianBurst)
-#         f_names_stats.append('out_stdevBurst')
-#         f_values_stats.append(out_stdevBurst)
-#         f_names_stats.append('out_varianceBurst')
-#         f_values_stats.append(out_varianceBurst)
-#         f_names_stats.append('out_kurtosisBurst')
-#         f_values_stats.append(out_kurtosisBurst)
-#         f_names_stats.append('out_skewBurst')
-#         f_values_stats.append(out_skewBurst)
-
-#         f_names_stats.append('out_p10Burst')
-#         f_values_stats.append(out_p10Burst)
-#         f_names_stats.append('out_p20Burst')
-#         f_values_stats.append(out_p20Burst)
-#         f_names_stats.append('out_p30Burst')
-#         f_values_stats.append(out_p30Burst)
-#         f_names_stats.append('out_p40Burst')
-#         f_values_stats.append(out_p40Burst)
-#         f_names_stats.append('out_p50Burst')
-#         f_values_stats.append(out_p50Burst)
-#         f_names_stats.append('out_p60Burst')
-#         f_values_stats.append(out_p60Burst)
-#         f_names_stats.append('out_p70Burst')
-#         f_values_stats.append(out_p70Burst)
-#         f_names_stats.append('out_p80Burst')
-#         f_values_stats.append(out_p80Burst)
-#         f_names_stats.append('out_p90Burst')
-#         f_values_stats.append(out_p90Burst)
-
-        #################################################################
-        # Outgoing Packet Bursts data size features
-#         f_names_stats.append('out_maxBurstBytes')
-#         f_values_stats.append(out_maxBurstBytes)
-#         f_names_stats.append('out_minBurstBytes')
-#         f_values_stats.append(out_minBurstBytes)
-#         f_names_stats.append('out_meanBurstBytes')
-#         f_values_stats.append(out_meanBurstBytes)
-#         # f_names_stats.append('out_medianBurstBytes')
-#         # f_values_stats.append(out_medianBurstBytes)
-#         f_names_stats.append('out_stdevBurstBytes')
-#         f_values_stats.append(out_stdevBurstBytes)
-#         f_names_stats.append('out_varianceBurstBytes')
-#         f_values_stats.append(out_varianceBurstBytes)
-#         f_names_stats.append('out_kurtosisBurstBytes')
-#         f_values_stats.append(out_kurtosisBurstBytes)
-#         f_names_stats.append('out_skewBurstBytes')
-#         f_values_stats.append(out_skewBurstBytes)
-
-#         f_names_stats.append('out_p10BurstBytes')
-#         f_values_stats.append(out_p10BurstBytes)
-#         f_names_stats.append('out_p20BurstBytes')
-#         f_values_stats.append(out_p20BurstBytes)
-#         f_names_stats.append('out_p30BurstBytes')
-#         f_values_stats.append(out_p30BurstBytes)
-#         f_names_stats.append('out_p40BurstBytes')
-#         f_values_stats.append(out_p40BurstBytes)
-#         f_names_stats.append('out_p50BurstBytes')
-#         f_values_stats.append(out_p50BurstBytes)
-#         f_names_stats.append('out_p60BurstBytes')
-#         f_values_stats.append(out_p60BurstBytes)
-#         f_names_stats.append('out_p70BurstBytes')
-#         f_values_stats.append(out_p70BurstBytes)
-#         f_names_stats.append('out_p80BurstBytes')
-#         f_values_stats.append(out_p80BurstBytes)
-#         f_names_stats.append('out_p90BurstBytes')
-#         f_values_stats.append(out_p90BurstBytes)
-
-        #################################################################
-        # Incoming Packet number of Bursts features
-#         f_names_stats.append('in_totalBursts')
-#         f_values_stats.append(in_totalBursts)
-#         f_names_stats.append('in_maxBurst')
-#         f_values_stats.append(in_maxBurst)
-#         f_names_stats.append('in_meanBurst')
-#         f_values_stats.append(in_meanBurst)
-#         f_names_stats.append('in_stdevBurst')
-#         f_values_stats.append(in_stdevBurst)
-#         f_names_stats.append('in_varianceBurst')
-#         f_values_stats.append(in_varianceBurst)
-#         f_names_stats.append('in_kurtosisBurst')
-#         f_values_stats.append(in_kurtosisBurst)
-#         f_names_stats.append('in_skewBurst')
-#         f_values_stats.append(in_skewBurst)
-
-#         f_names_stats.append('in_p10Burst')
-#         f_values_stats.append(in_p10Burst)
-#         f_names_stats.append('in_p20Burst')
-#         f_values_stats.append(in_p20Burst)
-#         f_names_stats.append('in_p30Burst')
-#         f_values_stats.append(in_p30Burst)
-#         f_names_stats.append('in_p40Burst')
-#         f_values_stats.append(in_p40Burst)
-#         f_names_stats.append('in_p50Burst')
-#         f_values_stats.append(in_p50Burst)
-#         f_names_stats.append('in_p60Burst')
-#         f_values_stats.append(in_p60Burst)
-#         f_names_stats.append('in_p70Burst')
-#         f_values_stats.append(in_p70Burst)
-#         f_names_stats.append('in_p80Burst')
-#         f_values_stats.append(in_p80Burst)
-#         f_names_stats.append('in_p90Burst')
-#         f_values_stats.append(in_p90Burst)
-
-        #################################################################
-        # Incoming Packet Bursts data size features
-#         f_names_stats.append('in_maxBurstBytes')
-#         f_values_stats.append(in_maxBurstBytes)
-#         f_names_stats.append('in_minBurstBytes')
-#         f_values_stats.append(in_minBurstBytes)
-#         f_names_stats.append('in_meanBurstBytes')
-#         f_values_stats.append(in_meanBurstBytes)
-#         # f_names_stats.append('in_medianBurstBytes')
-#         # f_values_stats.append(in_medianBurstBytes)
-#         f_names_stats.append('in_stdevBurstBytes')
-#         f_values_stats.append(in_stdevBurstBytes)
-#         f_names_stats.append('in_varianceBurstBytes')
-#         f_values_stats.append(in_varianceBurstBytes)
-#         f_names_stats.append('in_kurtosisBurstBytes')
-#         f_values_stats.append(in_kurtosisBurstBytes)
-#         f_names_stats.append('in_skewBurstBytes')
-#         f_values_stats.append(in_skewBurstBytes)
-
-#         f_names_stats.append('in_p10BurstBytes')
-#         f_values_stats.append(in_p10BurstBytes)
-#         f_names_stats.append('in_p20BurstBytes')
-#         f_values_stats.append(in_p20BurstBytes)
-#         f_names_stats.append('in_p30BurstBytes')
-#         f_values_stats.append(in_p30BurstBytes)
-#         f_names_stats.append('in_p40BurstBytes')
-#         f_values_stats.append(in_p40BurstBytes)
-#         f_names_stats.append('in_p50BurstBytes')
-#         f_values_stats.append(in_p50BurstBytes)
-#         f_names_stats.append('in_p60BurstBytes')
-#         f_values_stats.append(in_p60BurstBytes)
-#         f_names_stats.append('in_p70BurstBytes')
-#         f_values_stats.append(in_p70BurstBytes)
-#         f_names_stats.append('in_p80BurstBytes')
-#         f_values_stats.append(in_p80BurstBytes)
-#         f_names_stats.append('in_p90BurstBytes')
-#         f_values_stats.append(in_p90BurstBytes)
-
-
         # Write Stats csv
         f_names_stats.append('Class')
-        f_values_stats.append(label)
+        f_values_stats.append(data_class)
 
         if (not written_header_stats):
             arff_stats.write(', '.join(f_names_stats).encode('utf-8'))
@@ -859,7 +658,7 @@ def FeatureExtractionCombined(sampleFolder):
             f_values_pl.append(b)
 
         f_names_pl.append('Class')
-        f_values_pl.append(label)
+        f_values_pl.append(data_class)
 
         if (not written_header_pl):
             arff_pl.write(', '.join(f_names_pl).encode('utf-8'))
@@ -871,47 +670,9 @@ def FeatureExtractionCombined(sampleFolder):
             l.append(str(v))
         arff_pl.write(', '.join(l).encode('utf-8'))
         arff_pl.write('\n'.encode('utf-8'))
+        
+        print ("TCP Protocols seen: " + str(tcp_protocols_seen))
+
 
     arff_stats.close()
     arff_pl.close()
-
-    print ("UDP Protocols seen: " + str(udp_protocols_seen))
-
-def profile_processing(data_folder):
-    cfgs = [
-        # start_time, end_time, baseline_size
-        [0, 30, 250],
-    ]
-    network_condition = network_condition_type
-    profile = profile_type
-    cap_folder_name = "teleop_data"
-
-    PrintColored("Analyzing " + network_condition + " Network Condition", "yellow")
-    samples_folder = data_folder
-    
-    #For different splits of baseline sizes (currently half of each dataset = 250 samples)
-    for cfg in cfgs:
-        start_time = cfg[0]
-        end_time = cfg[1]
-        baseline_size = cfg[2]
-        PrintColored("Parsing data for start_time " + str(start_time) + ", end_time " + str(end_time) + ", baseline_size " + str(baseline_size), 'red')
-
-        random.seed(a=1)
-        samples_random_list = os.listdir(samples_folder)
-        samples_random_list = [e for e in samples_random_list]
-        samples_random_list.sort()
-        random.shuffle(samples_random_list)
-
-        samples_baselines = []
-        number_samples_baselines = int(math.ceil(len(samples_random_list) / float(baseline_size)))
-
-        PrintColored("Generating " + str(number_samples_baselines) + " Baselines for " + b, 'red')
-        for i in range(0, number_samples_baselines):
-            samples_baselines.append(samples_random_list[i * baseline_size:i * baseline_size + baseline_size])
-
-
-        ## Combined Feature Extraction
-        for i, baseline in enumerate(samples_baselines):
-            PrintColored("Generating feature sets for " + b + "_" + str(i), 'green')
-            FeatureExtractionCombined(samples_folder, cap_folder_name, baseline, b + "_" + str(i), b, profile, network_condition)
-            print("\n")
