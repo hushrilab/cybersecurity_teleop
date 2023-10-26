@@ -1,0 +1,2 @@
+corr_mean,corr_std,corr_median,corr_percentile_25,corr_percentile_75,corr_max,corr_min,corr_skewness,corr_kurtosis,num_clusters,total_length,average_length,total_time,average_time_gap
+-0.0013383436912329405,0.20528347973715233,0.0,0.0,1.563781538051234e-17,0.9402177686793469,-0.9402177686793469,0.015823010739724145,7.951464157454021,0,0,0,0,0

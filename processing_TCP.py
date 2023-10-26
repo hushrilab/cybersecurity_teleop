@@ -23,25 +23,27 @@ def RoundToNearest(n, m):
         r = n % m
         return n + m - r if r + r >= m else n - r
 
-def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip, data_class):
+def FeatureExtractionCombined(base_dir, dest_ip, source_ip, action):
+    sampleFolder = base_dir+"/"+action
     samples = os.listdir(sampleFolder)
 
+    feature_set_folder_stats = "extractedFeatures/" + action + '/traff_stats'
+    if not os.path.exists(feature_set_folder_stats):
+        os.makedirs(feature_set_folder_stats)
+
+    feature_set_folder_pl = "extractedFeatures/" + action + '/pkt_len'
+    if not os.path.exists(feature_set_folder_pl):
+        os.makedirs(feature_set_folder_pl)
+        
     for i, sample in enumerate(samples):
         if (".DS_Store" in sample):
             continue
         if not os.path.exists(sampleFolder + "/" + sample):
             print("Corresponding .pcap does not exist")
             continue
-        feature_set_folder_stats = "extractedFeatures/" + sample[:-5] + '/Stats'
-        if not os.path.exists(feature_set_folder_stats):
-            os.makedirs(feature_set_folder_stats)
 
-        feature_set_folder_pl = "extractedFeatures/" + sample[:-5] + '/PL'
-        if not os.path.exists(feature_set_folder_pl):
-            os.makedirs(feature_set_folder_pl)
-
-        arff_path_stats = feature_set_folder_stats + '/Stats' + '.csv'
-        arff_path_pl = feature_set_folder_pl + '/PL' + '.csv'
+        arff_path_stats = feature_set_folder_stats + '/' + sample[:-5]  + '.csv'
+        arff_path_pl = feature_set_folder_pl + '/' + sample[:-5]  + '.csv'
 
         arff_stats = open(arff_path_stats, 'wb')
         arff_pl = open(arff_path_pl, 'wb')
@@ -79,7 +81,7 @@ def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip, data_class):
         bin_dict2 = {}
         binWidth = 5
         # Generate the set of all possible bins
-        for i in range(0, 1500, binWidth):
+        for i in range(0, 1000, binWidth):
             bin_dict[i] = 0
             bin_dict2[i] = 0
 
@@ -380,11 +382,14 @@ def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip, data_class):
         bin_list = []
         for i in od_dict:
             bin_list.append(od_dict[i])
-
         od_dict2 = collections.OrderedDict(sorted(bin_dict2.items(), key=lambda t: float(t[0])))
         bin_list2 = []
         for i in od_dict2:
             bin_list2.append(od_dict2[i])
+        print("155: " + str(od_dict2[155]))
+        print("160: " + str(od_dict2[160]))
+        print("165: " + str(od_dict2[165]))
+        print("170: " + str(od_dict2[170]))
 
         ###################################################################
         # Global Packet Features
@@ -631,24 +636,23 @@ def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip, data_class):
 
         # Write Stats csv
         f_names_stats.append('Class')
-        f_values_stats.append(data_class)
+        f_values_stats.append(action)
 
         if (not written_header_stats):
-            arff_stats.write(', '.join(f_names_stats).encode('utf-8'))
+            arff_stats.write(','.join(f_names_stats).encode('utf-8'))
             arff_stats.write('\n'.encode('utf-8'))
             written_header_stats = True
 
         l = []
         for v in f_values_stats:
             l.append(str(v))
-        arff_stats.write(', '.join(l).encode('utf-8'))
+        arff_stats.write(','.join(l).encode('utf-8'))
         arff_stats.write('\n'.encode('utf-8'))
 
 
         # Write PL csv
         f_names_pl = []
         f_values_pl = []
-
         for i, b in enumerate(bin_list):
             f_names_pl.append('packetLengthBin_' + str(i))
             f_values_pl.append(b)
@@ -658,20 +662,20 @@ def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip, data_class):
             f_values_pl.append(b)
 
         f_names_pl.append('Class')
-        f_values_pl.append(data_class)
+        f_values_pl.append(action)
 
         if (not written_header_pl):
-            arff_pl.write(', '.join(f_names_pl).encode('utf-8'))
+            arff_pl.write(','.join(f_names_pl).encode('utf-8'))
             arff_pl.write('\n'.encode('utf-8'))
             written_header_pl = True
 
         l = []
         for v in f_values_pl:
             l.append(str(v))
-        arff_pl.write(', '.join(l).encode('utf-8'))
+        arff_pl.write(','.join(l).encode('utf-8'))
         arff_pl.write('\n'.encode('utf-8'))
         
-        print ("TCP Protocols seen: " + str(tcp_protocols_seen))
+#         print ("TCP Protocols seen: " + str(tcp_protocols_seen))
 
 
     arff_stats.close()

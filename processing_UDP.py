@@ -23,25 +23,27 @@ def RoundToNearest(n, m):
         r = n % m
         return n + m - r if r + r >= m else n - r
 
-def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip):
+def FeatureExtractionCombined(base_dir, dest_ip, source_ip, action):
+    sampleFolder = base_dir+"/"+action
     samples = os.listdir(sampleFolder)
 
+    feature_set_folder_stats = "extractedFeatures/" + action + '/traff_stats'
+    if not os.path.exists(feature_set_folder_stats):
+        os.makedirs(feature_set_folder_stats)
+
+    feature_set_folder_pl = "extractedFeatures/" + action + '/pkt_len'
+    if not os.path.exists(feature_set_folder_pl):
+        os.makedirs(feature_set_folder_pl)
+        
     for i, sample in enumerate(samples):
         if (".DS_Store" in sample):
             continue
         if not os.path.exists(sampleFolder + "/" + sample):
             print("Corresponding .pcap does not exist")
             continue
-        feature_set_folder_stats = "extractedFeatures/" + sample[:-5] + '/Stats'
-        if not os.path.exists(feature_set_folder_stats):
-            os.makedirs(feature_set_folder_stats)
 
-        feature_set_folder_pl = "extractedFeatures/" + sample[:-5] + '/PL'
-        if not os.path.exists(feature_set_folder_pl):
-            os.makedirs(feature_set_folder_pl)
-
-        arff_path_stats = feature_set_folder_stats + '/Stats' + '.csv'
-        arff_path_pl = feature_set_folder_pl + '/PL' + '.csv'
+        arff_path_stats = feature_set_folder_stats + '/' + sample[:-5]  + '.csv'
+        arff_path_pl = feature_set_folder_pl + '/' + sample[:-5]  + '.csv'
 
         arff_stats = open(arff_path_stats, 'wb')
         arff_pl = open(arff_path_pl, 'wb')
@@ -79,7 +81,7 @@ def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip):
         bin_dict2 = {}
         binWidth = 5
         # Generate the set of all possible bins
-        for i in range(0, 1500, binWidth):
+        for i in range(0, 1000, binWidth):
             bin_dict[i] = 0
             bin_dict2[i] = 0
 
@@ -132,7 +134,6 @@ def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip):
 
                     # If source is recipient
                     if (src_ip_addr_str == dest_ip):
-                        print("got here")
                         totalPacketsIn += 1
                         packetSizesIn.append(len(buf))
                         binned = RoundToNearest(len(buf), binWidth)
@@ -196,13 +197,7 @@ def FeatureExtractionCombined(sampleFolder, dest_ip, source_ip):
             except:
                 pass
         f.close()
-        
-        print(len(packetSizesIn))
-        print(len(packetTimesIn))
-        print(len(out_bursts_packets))
-        print(len(out_burst_sizes))
-        print(len(in_bursts_packets))
-        print(len(in_burst_sizes))
+
         ################################################################
         ####################Compute statistics#####################
         ################################################################
