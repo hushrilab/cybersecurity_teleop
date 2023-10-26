@@ -20,9 +20,14 @@ Then run:
 
 to launch Jupyter Notebook.
 
+#### `Analysis Pipeline`
+
+In main.ipynb, run all cells to run the entire analysis pipeline. Note: it is assumed that all the action data are in the "action_data" directory and organized into specific structure. 
+
 ## To Do
 
-- Account for when total packets in or out is 0
+- Add Evaluation
+- Deploy Defenses
 
 ## Acknowledgements
 
